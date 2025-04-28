@@ -110,7 +110,6 @@ const RegisterPage = () => {
     try {
       setIsSubmitting(true);
       const {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         confirmPassword: _confirmPassword,
         companyName,
         industry,
@@ -234,7 +233,7 @@ const RegisterPage = () => {
                 <FormField
                   control={jobSeekerForm.control}
                   name="name"
-                  render={({ field }) => (
+                  render={({ field }: { field: any }) => (
                     <FormItem>
                       <FormLabel>Full Name</FormLabel>
                       <FormControl>
@@ -253,7 +252,7 @@ const RegisterPage = () => {
                 <FormField
                   control={jobSeekerForm.control}
                   name="email"
-                  render={({ field }) => (
+                  render={({ field }: { field: any }) => (
                     <FormItem>
                       <FormLabel>Email address</FormLabel>
                       <FormControl>
@@ -273,7 +272,7 @@ const RegisterPage = () => {
                 <FormField
                   control={jobSeekerForm.control}
                   name="password"
-                  render={({ field }) => (
+                  render={({ field }: { field: any }) => (
                     <FormItem>
                       <FormLabel>Password</FormLabel>
                       <FormControl>
@@ -318,7 +317,7 @@ const RegisterPage = () => {
                 <FormField
                   control={jobSeekerForm.control}
                   name="confirmPassword"
-                  render={({ field }) => (
+                  render={({ field }: { field: any }) => (
                     <FormItem>
                       <FormLabel>Confirm Password</FormLabel>
                       <FormControl>
@@ -386,7 +385,7 @@ const RegisterPage = () => {
                 <FormField
                   control={employerForm.control}
                   name="companyName"
-                  render={({ field }) => (
+                  render={({ field }: { field: any }) => (
                     <FormItem>
                       <FormLabel>Company Name</FormLabel>
                       <FormControl>
@@ -406,7 +405,7 @@ const RegisterPage = () => {
                   <FormField
                     control={employerForm.control}
                     name="industry"
-                    render={({ field }) => (
+                    render={({ field }: { field: any }) => (
                       <FormItem>
                         <FormLabel>Industry</FormLabel>
                         <FormControl>
@@ -433,7 +432,7 @@ const RegisterPage = () => {
                   <FormField
                     control={employerForm.control}
                     name="size"
-                    render={({ field }) => (
+                    render={({ field }: { field: any }) => (
                       <FormItem>
                         <FormLabel>Company Size</FormLabel>
                         <FormControl>
@@ -460,7 +459,7 @@ const RegisterPage = () => {
                 <FormField
                   control={employerForm.control}
                   name="name"
-                  render={({ field }) => (
+                  render={({ field }: { field: any }) => (
                     <FormItem>
                       <FormLabel>Your Name</FormLabel>
                       <FormControl>
@@ -479,7 +478,7 @@ const RegisterPage = () => {
                 <FormField
                   control={employerForm.control}
                   name="email"
-                  render={({ field }) => (
+                  render={({ field }: { field: any }) => (
                     <FormItem>
                       <FormLabel>Work Email</FormLabel>
                       <FormControl>
@@ -499,7 +498,7 @@ const RegisterPage = () => {
                 <FormField
                   control={employerForm.control}
                   name="password"
-                  render={({ field }) => (
+                  render={({ field }: { field: any }) => (
                     <FormItem>
                       <FormLabel>Password</FormLabel>
                       <FormControl>
@@ -544,7 +543,7 @@ const RegisterPage = () => {
                 <FormField
                   control={employerForm.control}
                   name="confirmPassword"
-                  render={({ field }) => (
+                  render={({ field }: { field: any }) => (
                     <FormItem>
                       <FormLabel>Confirm Password</FormLabel>
                       <FormControl>

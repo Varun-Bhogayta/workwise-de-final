@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect} from "react";
 import { useParams, Link } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
@@ -15,6 +14,7 @@ import {
   updateDoc,
   increment,
   arrayUnion,
+  DocumentData,
 } from "firebase/firestore";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -112,7 +112,7 @@ export default function JobDetailsPage() {
 
           // Get the company details from users collection (where employers are stored)
           const companyId = jobData.company;
-          let companyData = null;
+          let companyData : DocumentData | null = null;
 
           if (companyId) {
             // First try the profiles collection (where employer accounts are stored)
