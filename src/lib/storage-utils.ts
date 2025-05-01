@@ -28,7 +28,6 @@ async function uploadFileToStorage(
   path: string,
   metadata?: Record<string, any>
 ): Promise<string> {
-  const storageRef = ref(storage, path);
   
   // Try upload with retry logic
   let attempts = 0;

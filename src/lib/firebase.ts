@@ -3,11 +3,10 @@ import { initializeApp } from "firebase/app";
 import {
   getAuth,
   GoogleAuthProvider,
-  connectAuthEmulator,
 } from "firebase/auth";
 import { getStorage, connectStorageEmulator } from "firebase/storage";
-import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
-import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
+import { getFirestore } from "firebase/firestore";
+import { getFunctions } from "firebase/functions";
 
 // Firebase configuration from environment variables
 const firebaseConfig = {
@@ -43,7 +42,6 @@ if (import.meta.env.DEV) {
 
 // Set CORS configuration for Storage
 // This helps configure client-side settings to improve CORS behavior
-storage.customDomain = firebaseConfig.storageBucket || undefined;
 storage.maxUploadRetryTime = 60000; // 60 seconds max retry time
 storage.maxOperationRetryTime = 60000; // 60 seconds max operation time
 
