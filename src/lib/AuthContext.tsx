@@ -425,6 +425,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setLoading(true);
       setError(null);
 
+      if (!isOnline) {
+        throw new Error(
+          "You are offline. Please check your internet connection and try again."
+        );
+      }
+
       // Create the user in Firebase Auth
       const result = await createUserWithEmailAndPassword(
         auth,
@@ -433,6 +439,72 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       );
 
       const firebaseUser = result.user;
+
+      // Create a profile in Firestore based on the user role
+      const now = new Date().toISOString();
+      let profileData: any;
+
+      if (userData.role === "employer") {
+        profileData = {
+          id: firebaseUser.uid,
+          email: userData.email,
+          role: "employer",
+          company_name: userData.companyName || "",
+          company_industry: userData.industry || "",
+          company_size: userData.size || "",
+          full_name: userData.name || "",
+          created_at: now,
+          updated_at: now,
+        };
+
+        // Also create a company record
+        const companyData = {
+          id: firebaseUser.uid,
+          name: userData.companyName || "",
+          company_name: userData.companyName || "",
+          company_industry: userData.industry || "",
+          company_size: userData.size || "",
+          created_at: now,
+          updated_at: now,
+          is_verified: false,
+          _count: { jobs: 0 },
+        };
+
+        try {
+          await setDoc(doc(db, "companies", firebaseUser.uid), companyData);
+        } catch (companyErr) {
+          console.error("Error creating company record:", companyErr);
+          // Continue with user registration even if company creation fails
+          toast({
+            title: "Partial registration",
+            description:
+              "Your account was created but company profile setup had an issue.",
+            variant: "destructive",
+          });
+        }
+      } else {
+        profileData = {
+          id: firebaseUser.uid,
+          email: userData.email,
+          role: "jobseeker",
+          full_name: userData.name || "",
+          created_at: now,
+          updated_at: now,
+        };
+      }
+
+      // Create the profile document
+      try {
+        await setDoc(doc(db, "profiles", firebaseUser.uid), profileData);
+      } catch (profileErr) {
+        console.error("Error creating profile:", profileErr);
+        toast({
+          title: "Profile setup issue",
+          description:
+            "Your account was created but profile setup had an issue. Some features may be limited.",
+          variant: "destructive",
+        });
+      }
 
       // Set the user state
       setUser({
@@ -496,8 +568,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       if (!user) throw new Error("Not authenticated");
 
+      // Filter out undefined values to prevent Firestore errors
+      const cleanedProfileData = Object.fromEntries(
+        Object.entries(profileData).filter(([_, value]) => value !== undefined)
+      );
+
+      // Add a timestamp for the update
+      cleanedProfileData.updated_at = new Date().toISOString();
+
+      // Handle potential CORS issues with avatars or logos by validating URLs
+      if (
+        cleanedProfileData.avatar_url &&
+        typeof cleanedProfileData.avatar_url === "string" &&
+        cleanedProfileData.avatar_url.startsWith("blob:")
+      ) {
+        console.warn(
+          "Received blob URL instead of a Storage URL. This might indicate that the file upload hasn't completed yet."
+        );
+        // Keep the previous avatar URL to prevent issues
+        delete cleanedProfileData.avatar_url;
+      }
+
+      if (
+        cleanedProfileData.company_logo_url &&
+        typeof cleanedProfileData.company_logo_url === "string" &&
+        cleanedProfileData.company_logo_url.startsWith("blob:")
+      ) {
+        console.warn(
+          "Received blob URL instead of a Storage URL. This might indicate that the file upload hasn't completed yet."
+        );
+        // Keep the previous logo URL to prevent issues
+        delete cleanedProfileData.company_logo_url;
+      }
+
       // Update the profile in Firestore
-      await updateDoc(doc(db, "profiles", user.id), profileData);
+      await updateDoc(doc(db, "profiles", user.id), cleanedProfileData);
 
       // If the user is an employer, also update the company data
       if (user.role === "employer") {
@@ -505,17 +610,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         const companyDoc = await getDoc(doc(db, "companies", user.id));
 
         // Prepare company data with updated fields
-        const companyData = {
+        const companyData: Record<string, any> = {
           name: profileData.company_name,
           company_name: profileData.company_name,
           company_logo_url: profileData.company_logo_url,
-          company_website: profileData.company_website,
-          company_industry: profileData.company_industry,
-          company_size: profileData.company_size,
-          company_description: profileData.company_about || profileData.bio,
-          location: profileData.location,
           updated_at: new Date().toISOString(),
         };
+
+        // Only add fields that have values
+        if (profileData.company_website)
+          companyData.company_website = profileData.company_website;
+        if (profileData.company_industry)
+          companyData.company_industry = profileData.company_industry;
+        if (profileData.company_size)
+          companyData.company_size = profileData.company_size;
+
+        // Use bio or company_about for description, only if defined
+        if (profileData.company_about) {
+          companyData.company_description = profileData.company_about;
+        } else if (profileData.bio) {
+          companyData.company_description = profileData.bio;
+        }
+
+        if (profileData.location) companyData.location = profileData.location;
 
         if (companyDoc.exists()) {
           // Update existing company document

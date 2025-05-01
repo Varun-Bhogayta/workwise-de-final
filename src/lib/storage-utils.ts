@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { storage } from "./firebase";
+import { storage, auth } from "./firebase";
 import {
   ref,
   uploadBytes,
@@ -21,6 +21,7 @@ const ALLOWED_RESUME_TYPES = [
 
 /**
  * Base function to upload a file to Firebase Storage
+ * With improved CORS error handling and retry logic
  */
 async function uploadFileToStorage(
   file: File,
@@ -28,16 +29,56 @@ async function uploadFileToStorage(
   metadata?: Record<string, any>
 ): Promise<string> {
   const storageRef = ref(storage, path);
-
-  await uploadBytes(storageRef, file, {
-    contentType: file.type,
-    customMetadata: {
-      originalName: file.name,
-      ...metadata,
-    },
-  });
-
-  return getDownloadURL(storageRef);
+  
+  // Try upload with retry logic
+  let attempts = 0;
+  const maxAttempts = 3;
+  
+  while (attempts < maxAttempts) {
+    try {
+      attempts++;
+      
+      // Set CORS-friendly metadata to help with cross-origin issues
+      const uploadMetadata = {
+        contentType: file.type,
+        customMetadata: {
+          originalName: file.name,
+          ...metadata,
+        },
+      };
+      
+      // Add a cache-busting parameter to avoid CORS caching issues
+      const cacheBuster = `?cacheBust=${new Date().getTime()}`;
+      const effectivePath = path + cacheBuster;
+      const effectiveRef = ref(storage, effectivePath);
+      
+      const snapshot = await uploadBytes(effectiveRef, file, uploadMetadata);
+      
+      // If successful, return the download URL
+      const downloadUrl = await getDownloadURL(snapshot.ref);
+      console.log(`File uploaded successfully to ${path}`);
+      return downloadUrl;
+    } catch (error: any) {
+      console.error(`Upload attempt ${attempts} failed:`, error);
+      
+      // If this was the last attempt, throw the error
+      if (attempts >= maxAttempts) {
+        throw error;
+      }
+      
+      // If CORS error, wait a bit before retrying
+      if (
+        error.message?.includes("CORS") || 
+        error.code === "storage/unauthorized" ||
+        error.name === "QuotaExceededError" // Another common CORS-related error
+      ) {
+        console.log(`CORS issue detected, retrying in ${attempts * 1000}ms...`);
+        await new Promise(resolve => setTimeout(resolve, attempts * 1000));
+      }
+    }
+  }
+  
+  throw new Error("Maximum upload attempts exceeded");
 }
 
 export async function uploadImage(
@@ -49,8 +90,25 @@ export async function uploadImage(
 
     const fileExt = file.name.split(".").pop();
     const fileName = `${uuidv4()}.${fileExt}`;
-    const filePath = `${folder}/${fileName}`;
-
+    
+    // Use the correct path structure based on storage rules
+    // If folder is "avatars", map it to "images" as per storage rules
+    // If folder is "company_logos", map it to "companies" as per storage rules
+    let storageFolder = folder;
+    if (folder === "avatars") {
+      storageFolder = "images";
+    } else if (folder === "company_logos") {
+      storageFolder = "companies";
+    }
+    
+    // Get current user ID from auth if possible
+    const currentUser = auth.currentUser;
+    const userId = currentUser?.uid || "anonymous";
+    
+    // Use the correct path structure: /{storageFolder}/{userId}/{fileName}
+    const filePath = `${storageFolder}/${userId}/${fileName}`;
+    
+    console.log(`Uploading to path: ${filePath}`);
     return await uploadFileToStorage(file, filePath);
   } catch (error) {
     showErrorToast(error, "Image upload failed");

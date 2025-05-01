@@ -33,7 +33,7 @@ const LoginPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Always redirect to dashboard after login
-  const fromPath = "/dashboard";
+  const fromPath = "/";
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),

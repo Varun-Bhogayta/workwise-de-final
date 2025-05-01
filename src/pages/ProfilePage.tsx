@@ -24,7 +24,11 @@ export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(Date.now()); // Add a refresh key for image refreshing
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadTimeout, setUploadTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [refreshKey, setRefreshKey] = useState(Date.now());
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [previousImageUrl, setPreviousImageUrl] = useState<string | null>(null); // Save the previous image URL
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     // Common fields
@@ -171,18 +175,89 @@ export default function ProfilePage() {
     if (!file || !user) return;
 
     try {
+      // Save the current image URL before starting upload
+      const currentImageUrl = user.role === "employer" 
+        ? formData.company_logo_url 
+        : formData.avatar_url;
+      setPreviousImageUrl(currentImageUrl);
+      
+      // Create a preview URL for immediate feedback
+      const previewUrl = URL.createObjectURL(file);
+      setImagePreview(previewUrl);
+      
+      // Reset upload state
       setUploadingPhoto(true);
+      setUploadProgress(0);
+      
+      // Set a timeout to prevent infinite loading (30 seconds max)
+      const timeout = setTimeout(() => {
+        // If this executes, the upload has taken too long
+        setUploadingPhoto(false);
+        setUploadProgress(0);
+        setImagePreview(null);
+        
+        // Clean up the preview URL to prevent memory leaks
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        
+        toast({
+          title: "Upload timeout",
+          description: "The upload is taking too long. Please try again with a smaller image.",
+          variant: "destructive",
+        });
+      }, 30000); // 30 seconds timeout
+      
+      setUploadTimeout(timeout);
+      
+      // Simulate upload progress for better UX
+      const progressInterval = setInterval(() => {
+        setUploadProgress((prev) => {
+          // Only go up to 90% to show it's still processing
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return prev;
+          }
+          return prev + 5;
+        });
+      }, 300);
+      
       const folder = user.role === "employer" ? "company_logos" : "avatars";
       const downloadURL = await uploadImage(file, folder);
+      
+      // Clear the intervals and timeouts
+      clearInterval(progressInterval);
+      clearTimeout(timeout);
+      setUploadTimeout(null);
+      
+      // Finish progress
+      setUploadProgress(100);
 
       if (downloadURL) {
         if (user.role === "employer") {
           setFormData({ ...formData, company_logo_url: downloadURL });
+
+          // Update the Firestore document right away to ensure consistency
+          await updateDoc(doc(db, "profiles", user.id), {
+            company_logo_url: downloadURL,
+            updated_at: new Date().toISOString(),
+          });
         } else {
           setFormData({ ...formData, avatar_url: downloadURL });
+
+          // Update the Firestore document right away to ensure consistency
+          await updateDoc(doc(db, "profiles", user.id), {
+            avatar_url: downloadURL,
+            updated_at: new Date().toISOString(),
+          });
         }
 
-        setRefreshKey(Date.now()); // Update the refresh key to force image refresh
+        // Refresh the image by updating the key
+        setRefreshKey(Date.now());
+        // Clear the preview URL since we're now using the actual URL
+        setImagePreview(null);
+        // Clean up the preview URL to prevent memory leaks
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        // Clear the saved previous URL
+        setPreviousImageUrl(null);
 
         toast({
           title: "Photo uploaded",
@@ -193,15 +268,50 @@ export default function ProfilePage() {
       }
     } catch (error) {
       console.error("Error uploading photo:", error);
+      
+      // Clean up any timers
+      if (uploadTimeout) {
+        clearTimeout(uploadTimeout);
+        setUploadTimeout(null);
+      }
+      
+      // Clear the preview on error
+      if (imagePreview) URL.revokeObjectURL(imagePreview);
+      setImagePreview(null);
+      
+      // Restore previous image if available
+      if (user.role === "employer" && previousImageUrl) {
+        setFormData(prev => ({ ...prev, company_logo_url: previousImageUrl }));
+      } else if (previousImageUrl) {
+        setFormData(prev => ({ ...prev, avatar_url: previousImageUrl }));
+      }
+      
+      // Reset loading state
+      setUploadProgress(0);
+      
       toast({
         title: "Upload failed",
-        description: "Failed to upload profile photo. Please try again.",
+        description: "Failed to upload profile photo. Please try again with a smaller image.",
         variant: "destructive",
       });
     } finally {
       setUploadingPhoto(false);
     }
   };
+
+  // Clean up on component unmount
+  useEffect(() => {
+    return () => {
+      // Clean up any hanging timers when component unmounts
+      if (uploadTimeout) {
+        clearTimeout(uploadTimeout);
+      }
+      // Clean up image preview URL
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
+  }, [uploadTimeout, imagePreview]);
 
   const triggerFileInput = () => {
     fileInputRef.current?.click();
@@ -231,8 +341,18 @@ export default function ProfilePage() {
             <div className="relative">
               <Avatar className="h-16 w-16">
                 <AvatarImage
-                  key={refreshKey} // Use the refresh key to force image refresh
-                  src={`${formData.avatar_url || formData.company_logo_url}?t=${refreshKey}`}
+                  key={refreshKey}
+                  src={
+                    imagePreview || 
+                    (user.role === "employer"
+                      ? formData.company_logo_url
+                      : formData.avatar_url)
+                  }
+                  alt={
+                    user.role === "employer"
+                      ? "Company Logo"
+                      : "Profile Picture"
+                  }
                 />
                 <AvatarFallback>
                   {user.role === "employer"
@@ -240,6 +360,13 @@ export default function ProfilePage() {
                     : formData.name?.charAt(0) || "U"}
                 </AvatarFallback>
               </Avatar>
+              {uploadingPhoto && uploadProgress > 0 && (
+                <div className="absolute inset-0 bg-black/30 rounded-full flex items-center justify-center">
+                  <div className="h-8 w-8 rounded-full bg-white flex items-center justify-center text-xs font-semibold">
+                    {uploadProgress}%
+                  </div>
+                </div>
+              )}
               {isEditing && (
                 <Button
                   variant="outline"
@@ -434,7 +561,7 @@ export default function ProfilePage() {
                           {uploadingPhoto ? (
                             <>
                               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Uploading...
+                              {uploadProgress > 0 ? `${uploadProgress}%` : 'Uploading...'}
                             </>
                           ) : (
                             <>
@@ -550,7 +677,7 @@ export default function ProfilePage() {
                           {uploadingPhoto ? (
                             <>
                               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Uploading...
+                              {uploadProgress > 0 ? `${uploadProgress}%` : 'Uploading...'}
                             </>
                           ) : (
                             <>

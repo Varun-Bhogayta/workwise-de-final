@@ -9,9 +9,7 @@ import {
   Settings,
   FileText,
   LogOut,
-  Bell,
   ChevronDown,
-  LayoutDashboard,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/AuthContext";
@@ -144,10 +142,6 @@ const Navbar = () => {
                     <User className="mr-2 h-4 w-4" />
                     Edit Profile
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate("/dashboard")}>
-                    <LayoutDashboard className="mr-2 h-4 w-4" />
-                    Dashboard
-                  </DropdownMenuItem>
                   {user.role === "jobseeker" && (
                     <DropdownMenuItem onClick={() => navigate("/applications")}>
                       <FileText className="mr-2 h-4 w-4" />
@@ -187,17 +181,6 @@ const Navbar = () => {
 
         {/* Mobile menu button */}
         <div className="md:hidden flex items-center">
-          {user && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="relative mr-2"
-              onClick={() => navigate("/notifications")}
-            >
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-0 right-0 h-2 w-2 bg-destructive rounded-full"></span>
-            </Button>
-          )}
           <Button
             variant="ghost"
             size="icon"

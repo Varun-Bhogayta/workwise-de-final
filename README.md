@@ -11,7 +11,7 @@ WorkWise is a professional platform designed to connect businesses and professio
 
 ## Technology Stack
 
-- **Frontend**: React/Next.js
+- **Frontend**: React
 - **Backend**: Firebase
 - **Authentication**: Firebase Authentication with Google Sign-In
 - **Database**: Firebase Firestore
